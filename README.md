@@ -5,6 +5,24 @@
 1. **TapTap 批量更新**：把「我的游戏 → 本机 → N 款游戏可更新」里的游戏全部更新并装完。
 2. **游戏登录检测**：逐个启动游戏，确认能进到游戏里；需要登录的用 QQ / 微信一键授权登录。
 
+## 本次更新（2026-09-19）：新增游戏登录检测
+
+TapTap 批量更新部分此前已交付并合并，本次**没有改动**；这一轮新增的内容全部在 [`login-check/`](login-check/) 一个文件夹里，单独查看即可：
+
+| 新增 | 说明 |
+|---|---|
+| `login-check/system_prompt.txt` | 登录检测的规则（系统提示） |
+| `login-check/task.txt` | 登录检测任务，`{game}` 由运行时的游戏名替换 |
+| `login-check/examples/` | 填好「和平精英」「王者荣耀」的版本，测试时直接用 |
+| `login-check/README.md` | 用法、设计要点、实测记录 |
+
+一句话说明它解决什么：线上采集每次都会先结束游戏再冷启动，登录态掉了采集就会卡在登录页。
+这个任务在采集之前逐个启动游戏，确认能真正进到游戏里，需要登录的自己用 QQ / 微信一键授权登录完再确认一次。
+
+登录步骤**没有写死**：不按固定步数点，按按钮语义走（继续 / 同意 / 确认 / 授权就点，取消 / 拒绝 / 切换账号不点），
+所以不同游戏的流程差异能自己应付。实测和平精英与王者荣耀的登录入口文案、授权页数完全不同，都走通了。
+详见 [`login-check/README.md`](login-check/README.md)。
+
 ## 工作方式
 
 ```
@@ -27,9 +45,7 @@
 | `update_games.py` | 运行入口 |
 | `prompts/system_prompt.txt` | 系统提示：动作格式、坐标规则、MIUI 安装器每个弹窗的处理、不更新 TapTap 自身、权限弹窗、完成判定 |
 | `prompts/task_update_all.txt` | 任务：全部更新的步骤 |
-| `prompts/system_login_check.txt` | 登录检测的规则（系统提示） |
-| `prompts/task_login_check.txt` | 登录检测任务，`{game}` 由运行时的游戏名替换 |
-| `prompts/task_login_check_heping.txt`、`_wangzhe.txt` | 填好游戏名的测试版，内容与模板一致 |
+| `login-check/` | 登录检测：规则、任务、示例和说明（见该目录下的 README） |
 | `.env.example` | 模型配置模板 |
 
 ## 依赖
@@ -63,35 +79,17 @@ python update_games.py --max-steps 150          # 更新的游戏多、下载慢
 
 ## 登录检测（建议排在更新之后）
 
-线上采集每次都会先结束游戏再冷启动，所以游戏是否还处于登录态要先确认，否则采集会卡在登录页。
-
-```
-启动游戏 → 等加载
-  → 判断三种情况：已登录 / 需要登录 / 还在加载
-  → 需要登录：优先 QQ，其次微信，按屏幕上实际出现的按钮一步步授权
-  → 确认真的进入游戏后结束
-```
-
-要点：
-
-- **登录步骤不写死**：不按固定步数点。规则是按按钮语义走 —— 「继续 / 授权 / 登录 / 同意 / 确认 / 允许 / 下一步」可以点，
-  「取消 / 拒绝 / 切换账号 / 更换登录方式 / 注册 / 退出登录」不点。实测两个游戏的授权页数、按钮文案都不一样，都能走通。
-- **登录页可能只是加载过场**：有些游戏加载时会闪过登录页，等一会儿自己就进去了。所以第一次看到登录页先等 15–20 秒再判断，
-  仍停在登录页才去点。
-- **判定只看一条**：是否真的进入了游戏（大厅 / 主界面、「开始游戏」按钮、或选区页）。登录按钮消失、弹窗关掉都不算。
-  进了大厅就立即结束，不去逐个关活动弹窗。
-- **不碰的事**：账号密码、手机号、验证码、扫码、实名认证、人脸识别、充值、开始对局。遇到就结束并返回「需要人工：…」。
-
-运行（目前借 autoglm 的入口跑，需要该入口支持 `--prompt-file` / `--system-prompt-file`；接进 `update_games.py` 是下一步）：
+完整说明见 [`login-check/README.md`](login-check/README.md)。运行方式：
 
 ```bash
 cd /path/to/autoglm && python run.py --device <设备ID> --game "和平精英" \
-  --prompt-file /path/to/taptap-game-updater/prompts/task_login_check.txt \
-  --system-prompt-file /path/to/taptap-game-updater/prompts/system_login_check.txt \
+  --prompt-file /path/to/taptap-game-updater/login-check/task.txt \
+  --system-prompt-file /path/to/taptap-game-updater/login-check/system_prompt.txt \
   --max-steps 60 --run-label login-check
 ```
 
-一次检测一个游戏，跑完就结束；多个游戏由外层脚本按手机的游戏清单逐个跑，互不影响。
+一次检测一款游戏；需要入口支持 `--prompt-file` / `--system-prompt-file`。
+接进 `update_games.py`、做成批量 + 定时是下一步。
 
 ## 输出
 
@@ -122,14 +120,10 @@ cd /path/to/autoglm && python run.py --device <设备ID> --game "和平精英" \
 
 
 
-## 实测（2026-09-14 更新、09-19 登录检测；红米 Note 12T Pro，qwen3.8-flash）
+## 实测：TapTap 更新（2026-09-14，红米 Note 12T Pro，qwen3.8-flash）
 
 | 场景 | 结果 |
 |---|---|
 | 单款：明日方舟 | 2.7.61 → 2.7.71，15 步约 4 分钟 |
 | 全部更新：三国：谋定天下 + 无畏契约：源能行动 | 1.31.0 → 1.36.0、1.23.0 → 1.24.0，TapTap 保持 2.96.4；22 步约 7 分钟；途中关掉了 TapTap 自身的更新弹窗 |
 | 没有待更新的游戏 | 2 步识别「暂无可更新的游戏」后结束（用 autoglm `main` 代码跑） |
-| 登录检测：和平精英（需登录） | 走完 QQ 三页授权进入大厅，14 步约 2 分钟 |
-| 登录检测：王者荣耀（需登录） | QQ 两页授权，中间退回登录页自行重试一次，9 步 |
-| 登录检测：王者荣耀（已登录） | 3 步判定「无需登录，已进入游戏」 |
-| 登录检测：和平精英（登录页为加载过场） | 先等待不点，5 步判定「无需登录」，全程未点登录按钮 |
