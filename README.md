@@ -15,6 +15,7 @@ TapTap 批量更新部分此前已交付并合并，本次**没有改动**；这
 | `login-check/task.txt` | 登录检测任务，`{game}` 由运行时的游戏名替换 |
 | `login-check/examples/` | 填好「和平精英」「王者荣耀」的版本，测试时直接用 |
 | `login-check/README.md` | 用法、设计要点、实测记录 |
+| `login_check.py` | 登录检测的运行入口：按游戏清单逐个检测、汇总结果、可定时跑（**尚未实跑验证**） |
 
 一句话说明它解决什么：线上采集每次都会先结束游戏再冷启动，登录态掉了采集就会卡在登录页。
 这个任务在采集之前逐个启动游戏，确认能真正进到游戏里，需要登录的自己用 QQ / 微信一键授权登录完再确认一次。
@@ -42,7 +43,8 @@ TapTap 批量更新部分此前已交付并合并，本次**没有改动**；这
 
 | 文件 | 作用 |
 |---|---|
-| `update_games.py` | 运行入口 |
+| `update_games.py` | TapTap 批量更新的运行入口 |
+| `login_check.py` | 登录检测的运行入口（尚未实跑验证） |
 | `prompts/system_prompt.txt` | 系统提示：动作格式、坐标规则、MIUI 安装器每个弹窗的处理、不更新 TapTap 自身、权限弹窗、完成判定 |
 | `prompts/task_update_all.txt` | 任务：全部更新的步骤 |
 | `login-check/` | 登录检测：规则、任务、示例和说明（见该目录下的 README） |
@@ -79,17 +81,23 @@ python update_games.py --max-steps 150          # 更新的游戏多、下载慢
 
 ## 登录检测（建议排在更新之后）
 
-完整说明见 [`login-check/README.md`](login-check/README.md)。运行方式：
+完整说明见 [`login-check/README.md`](login-check/README.md)。
 
 ```bash
-cd /path/to/autoglm && python run.py --device <设备ID> --game "和平精英" \
-  --prompt-file /path/to/taptap-game-updater/login-check/task.txt \
-  --system-prompt-file /path/to/taptap-game-updater/login-check/system_prompt.txt \
-  --max-steps 60 --run-label login-check
+python login_check.py                          # 所有已连接手机，游戏清单从 autoglm 配置读
+python login_check.py --device <设备ID> --game "和平精英" --game "王者荣耀"
+python login_check.py --daily 04:00            # 每天 04:00 跑一轮
+python login_check.py --dry-run                # 只打印手机和待检测的游戏清单
 ```
 
-一次检测一款游戏；需要入口支持 `--prompt-file` / `--system-prompt-file`。
-接进 `update_games.py`、做成批量 + 定时是下一步。
+- 游戏清单来自 autoglm 的 `run_config.json`（设备 → phone 编号）和 `prompts/phoneN.py` 的 `games`，也可用 `--game` 指定。
+- 每个游戏先结束进程冷启动，跑完再结束；一个游戏卡住不影响后面的。
+- 判定两道：模型的结论 + adb 确认结束时前台确实是该游戏。模型说进去了但前台不对，会单独标出来。
+- 输出四种状态：无需登录 / 已完成登录 / 需要人工 / 进不去。全部通过时退出码为 0。
+
+> ⚠️ **`login_check.py` 本身还没有实跑验证过**（写完时测试手机已拔线），只做了语法检查和 `--dry-run`。
+> 提示词部分是真机测过的（见 `login-check/README.md` 的实测表）。第一次用建议先 `--dry-run`，
+> 再 `--game` 指定一两个游戏小范围试，确认无误再交给定时任务。
 
 ## 输出
 

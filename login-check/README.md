@@ -13,7 +13,16 @@
 
 ## 运行
 
-一次检测一款游戏，跑完即结束；多款游戏由外层脚本按手机的游戏清单逐个跑，互不影响。
+用仓库根目录的 `login_check.py`（按游戏清单逐个检测、汇总结果、可 `--daily` 定时）：
+
+```bash
+python login_check.py --device <设备ID> --game "和平精英" --game "王者荣耀"
+```
+
+> ⚠️ `login_check.py` 尚未实跑验证（写完时测试手机已拔线），只做了语法检查和 `--dry-run`；
+> 下面提示词的实测结果是用 autoglm 入口直接跑出来的。
+
+也可以直接用 autoglm 的入口跑单个游戏（我们测试时就是这么跑的）：
 
 ```bash
 cd /path/to/autoglm && python run.py --device <设备ID> --game "和平精英" \
